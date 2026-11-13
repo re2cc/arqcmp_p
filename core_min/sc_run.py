@@ -3,8 +3,11 @@
 usando Verilator como motor de simulacion y generando una onda .fst
 para verla con Surfer.
 
+Corre core_min_tb: el nucleo RV32I minimo (ProcessorCoreMin) que
+ejecuta add/sub/addi de principio a fin.
+
 Uso:
-    python3 sc_run.py            - compila y corre half/full/ripple_carry_adder
+    python3 sc_run.py            - compila y corre core_min_tb
     python3 sc_run.py --wave     - igual, y ademas abre la onda en Surfer
     python3 sc_run.py --view     - abre el waveform.fst incluido, sin simular
 """
@@ -29,25 +32,30 @@ VERILATOR_WARNINGS_OFF = [
     "-Wno-UNOPTFLAT", "-Wno-TIMESCALEMOD", "-Wno-IEEEMAYDEPRECATE", "-Wno-LATCH",
 ]
 
-TOPMODULE = "adders_tb"
+TOPMODULE = "core_min_tb"
 
 
-class AddersDesign(Design):
-    """half_adder + full_adder + ripple_carry_adder (4 bits)."""
+class CoreMinDesign(Design):
+    """Nucleo RV32I minimo: ALU, control, inmediato, banco de registros,
+    memoria de instrucciones y el datapath que los conecta."""
 
     def __init__(self):
         super().__init__()
-        self.set_name("adders")
-        self.set_dataroot("adders", HERE)
-        with self.active_dataroot("adders"):
+        self.set_name("core_min")
+        self.set_dataroot("core_min", HERE)
+        with self.active_dataroot("core_min"):
             with self.active_fileset("rtl"):
-                self.set_topmodule("ripple_carry_adder")
-                self.add_file("half_adder.sv")
-                self.add_file("full_adder.sv")
-                self.add_file("ripple_carry_adder.sv")
+                self.set_topmodule("ProcessorCoreMin")
+                self.add_file("risc_v_32_i_pkg.sv")
+                self.add_file("ArithmeticLogicUnit.sv")
+                self.add_file("ImmediateSignExtend.sv")
+                self.add_file("RegisterFile.sv")
+                self.add_file("CoreControlUnit_min.sv")
+                self.add_file("InstructionMemory_min.sv")
+                self.add_file("ProcessorCoreMin.sv")
             with self.active_fileset("testbench.verilator.v"):
                 self.set_topmodule(TOPMODULE)
-                self.add_file("adders_tb.sv")
+                self.add_file("core_min_tb.sv")
 
 
 def _configure_verilator_task(project):
@@ -73,11 +81,11 @@ def main():
         return
 
     project = Sim()
-    project.set_design(AddersDesign())
+    project.set_design(CoreMinDesign())
     project.add_fileset("testbench.verilator.v")
     project.add_fileset("rtl")
 
-    flow = Flowgraph("adders_sim")
+    flow = Flowgraph("core_min_sim")
     flow.node("compile", verilator_compile.CompileTask())
     flow.node("simulate", ExecInputTask())
     flow.edge("compile", "simulate")
